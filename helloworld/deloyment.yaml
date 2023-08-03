@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: appdemo
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: appconfigfile
+  namespace: appdemo
+type: Opaque
+data:
+  enableSSL: "ZmFsc2U="
+  disableLogin: "dHJ1ZQ=="
+immutable: false
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pythonapppv
+  namespace: appdemo
+spec:
+  storageClassName: hostpath
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  hostPath:
+    path: "/mnt/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pythonapppvc
+  namespace: appdemo
+spec:
+  storageClassName: hostpath
+  resources:
+    requests:
+      storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: appdemo
+  name: my-name
+  labels:
+    name: pythondemoapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: pythondemoapp
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: pythondemoapp
+    spec:
+      volumes:
+        - name: appvolstorage
+          persistentVolumeClaim:
+            claimName: pythonapppvc
+        - name: appconfigkeypassstore
+          secret:
+            secretName: keypassstore
+        - name: appconfigfile
+          secret:
+            secretName: appconfigfile
+      containers:
+        - image: ipedrazas/docmock
+          imagePullPolicy: Always
+          name: my-name
+          resources:
+            requests:
+              cpu: "20m"
+              memory: "55M"
+            limits:
+              cpu: "512m"
+              memory: "512M"
+          livenessProbe:
+            httpGet:
+              path: /_status/healthz
+              port: 5000
+            initialDelaySeconds: 90
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_status/healthz
+              port: 5000
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+          env:
+            - name: ENVVARNAME
+              value: ENVVARVALUE
+          ports:
+            - containerPort: 5000
+              name: my-name
+          volumeMounts:
+            - mountPath: /logs
+              name: appvolstorage
+            - mountPath: /src/keypassstore
+              name: appconfigkeypassstore
+            - mountPath: /src/appconfigfile
+              name: appconfigfile
+      restartPolicy: Always
