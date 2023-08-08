@@ -90,8 +90,8 @@ spec:
             httpGet:
               path: /_status/healthz
               port: 5000
-            initialDelaySeconds: 90
-            timeoutSeconds: 10
+            initialDelaySeconds: 100
+            timeoutSeconds: 100
           readinessProbe:
             httpGet:
               path: /_status/healthz
